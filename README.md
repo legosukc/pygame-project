@@ -4,4 +4,4 @@ Dependencies:
 
 Python For Windows 3.x: [https://www.python.org/downloads/windows/]
 
-Windows (shocking, ik)
+Windows *(shocking, ik)*
