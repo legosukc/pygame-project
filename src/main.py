@@ -1,23 +1,11 @@
 import pygame
 
+#best avg fps is 1811
+#current is about 272
+
 # Initialize Config
 SCREEN_WIDTH = 480
 SCREEN_HEIGHT = 360
-
-level = [
-    [3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 4],
-    [3, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 4],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-    [3, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-    [3, 0, 0, 0, 0, 0, 6, 7, 0, 0, 0, 0, 0, 0, 4],
-    [3, 0, 0, 0, 0, 6, 5, 5, 0, 0, 0, 0, 0, 0, 4],
-    [3, 0, 0, 0, 6, 3, 0, 0, 0, 0, 0, 0, 0, 2, 3],
-    [3, 0, 0, 6, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-    [3, 2, 2, 3, 3, 3, 0, 0, 2, 2, 2, 2, 2, 2, 3]
-]
 
 # Initialize Game
 pygame.init()
@@ -39,16 +27,15 @@ pygame.display.set_caption('The Prickly Penis') #Window Caption (top left thingy
 # Initialize Modules
 from pygame.locals import *
 import pygameplus
-import os
 import pygame.math as math
 import modules.mpd as mpd
 
 # Game Config
 Gravity = .5
 DEBUG = False
-FPS = 60 # 0 = Unlimited
+FPS = pygame.display.get_current_refresh_rate() #0 = Unlimited
 
-level = mpd.ReadLevel(open(os.path.join('levels', 'level.mpd'), 'rb'))
+level = mpd.ReadLevel(open('levels\level.mpd', 'rb'))
 
 class player(pygame.sprite.Sprite):
     # Player Config
@@ -115,26 +102,24 @@ class player(pygame.sprite.Sprite):
             plr.vx = math.clamp(plr.vx, -plr.gVCX, plr.gVCX)
         else: plr.vx = math.clamp(plr.vx, -plr.aVCX, plr.aVCX)
         plr.vy = math.clamp(plr.vy, -plr.VCY, plr.VCY)
-        
-        collide = geometry #pygameplus.GetClosetSprites(plr, geometry, 32)
 
         # X Collision
-        plr.rect.x += plr.vx
-        if pygame.sprite.spritecollideany(plr, collide):
+        plr.rect.x += plr.vx * deltaTime
+        if pygame.sprite.spritecollideany(plr, geometry):
             if plr.vx != 0:
                 velDir = plr.vx > 0 and 1 or -1
-                while pygame.sprite.spritecollideany(plr, collide):
+                while pygame.sprite.spritecollideany(plr, geometry):
                     plr.rect.x -= velDir
                 plr.vx = 0
             #end
         #end
         
         # Y Collision
-        plr.rect.y += plr.vy
-        if pygame.sprite.spritecollideany(plr, collide):
+        plr.rect.y += plr.vy * deltaTime
+        if pygame.sprite.spritecollideany(plr, geometry):
             if plr.vy != 0:
                 velDir = plr.vy > 0 and 1 or -1
-                while pygame.sprite.spritecollideany(plr, collide):
+                while pygame.sprite.spritecollideany(plr, geometry):
                     plr.rect.y -= velDir
                 #end
                 if plr.JumpsDone > 0 and plr.vy >= 0:
@@ -156,6 +141,10 @@ class player(pygame.sprite.Sprite):
     #end
 #end
 
+def GetLevel(tileCache):
+    geometry = mpd.UpdateLevel(level, SCREEN_WIDTH, SCREEN_HEIGHT, tileCache=tileCache)
+    return geometry[0], geometry[1]
+
 # Main
 if __name__ == '__main__':
     plr = player()
@@ -163,16 +152,20 @@ if __name__ == '__main__':
     renderSprites = sprites.copy()
     Running = True
     clock = pygame.time.Clock()
+    tileCache = []
+    deltaTime = 1
     while Running:
         for event in pygame.event.get():
             Running = event.type != QUIT
-        geometry = mpd.UpdateLevel(level, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+        geometry, tileCache = GetLevel(tileCache)
         plr.update(pygame.key.get_pressed())
         #Render
         screen.fill((0, 0, 0))
         geometry.draw(screen)
         renderSprites.draw(screen)
         pygame.display.update()
+        #Delta Time
+        deltaTime = clock.get_fps() / FPS
         clock.tick(FPS)
     pygame.quit()
 #end
