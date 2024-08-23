@@ -1,11 +1,11 @@
 import pygame
-
 #best avg fps is 1811
 #current is about 272
+#14.5 cpu usage
 
 # Initialize Config
-SCREEN_WIDTH = 480
-SCREEN_HEIGHT = 360
+SCREEN_WIDTH = 480 * 2
+SCREEN_HEIGHT = 360 * 2
 
 # Initialize Game
 pygame.init()
@@ -15,13 +15,14 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 # Progress Text
 progress = None
 def UpdateProgressText(text=str):
-    progress = pygame.font.SysFont('Comic Sans MS', 30).render(f'{text}...', True, (255, 255, 255))
+    progress = pygame.font.SysFont('Comic Sans MS', 20).render(text, True, (255, 255, 255))
     screen.blit(progress, (SCREEN_WIDTH-progress.get_width(), SCREEN_HEIGHT-progress.get_height()))
     pygame.display.update()
 #end
-UpdateProgressText('give me a second bud')
+        
+UpdateProgressText('give me a second bud... (yes, this is comic sans)')
 # Window Config
-pygame.display.set_caption('The Prickly Penis') #Window Caption (top left thingy)
+pygame.display.set_caption('platformer') #Window Caption (top left thingy)
 #pygame.display.set_icon(pygame.image.load('GrassTile.bmp'))
 
 # Initialize Modules
@@ -30,21 +31,31 @@ import pygameplus
 import pygame.math as math
 import modules.mpd as mpd
 
-# Game Config
+# Game Constants
 Gravity = .5
 DEBUG = False
 FPS = pygame.display.get_current_refresh_rate() #0 = Unlimited
 
 level = mpd.ReadLevel(open('levels\level.mpd', 'rb'))
 
-class player(pygame.sprite.Sprite):
+class Camera():
+    def __init__(cam):
+        cam.x = 0
+        cam.y = 0
+        cam.offX = 0
+        cam.offY = 0
+        cam.lstX = cam.x
+        cam.lstY = cam.y
+
+class player(pygame.sprite.DirtySprite):
     # Player Config
     def __init__(plr):
         super().__init__()
         # Looks
-        plr.image = pygame.Surface((10, 10)) # Player Size
+        plr.image = pygame.Surface((10, 20)) # Player Size
         plr.image.fill((255, 255, 255))
         plr.rect = plr.image.get_rect()
+        plr.dirty = 1
         # Position
         plr.rect.center = (SCREEN_WIDTH*.5, SCREEN_HEIGHT*.5)
         # States
@@ -55,7 +66,7 @@ class player(pygame.sprite.Sprite):
         #Base X Cap
         plr.BaVCX = 10 #Base Airborne VX Cap
         plr.BgVCX = 5 #Base Grounded VX Cap
-        #X Cap (changeable)
+        #X Cap (gets changed during gameplay)
         plr.aVCX = plr.BaVCX #Airborne
         plr.gVCX = plr.BgVCX #Grounded
         #VY Cap
@@ -63,8 +74,7 @@ class player(pygame.sprite.Sprite):
         #Movement
         plr.accel = 1 #How Fast You Can Reach The Cap
         plr.AirAccel = .2 #Airborne Version
-        plr.deccel = .2 #Basically Shoe Grippies :)
-        plr.JumpBoost = 1 #1.2
+        plr.deccel = .2 #Basically Shoe Grippies
         plr.vx = 0
         plr.vy = 0
     #end
@@ -73,8 +83,10 @@ class player(pygame.sprite.Sprite):
     def update(plr, keys):
         #Movement
         moveX = keys[K_d]-keys[K_a]
-        if moveX == 0 and plr.grounded:
-            plr.vx -= plr.vx * plr.deccel
+        if moveX == 0:
+            if plr.grounded:
+                plr.vx -= plr.vx * plr.deccel
+                if round(plr.vx) == 0: plr.vx = 0
         else:
             plr.vx += (plr.grounded and plr.accel or plr.AirAccel) * moveX
 
@@ -85,29 +97,24 @@ class player(pygame.sprite.Sprite):
         
         if (plr.grounded or plr.JumpsDone < 2) and plr.JumpHeldFrames == 1:
                 plr.JumpsDone += 1
-                if plr.JumpsDone < 2:
-                    plr.vy = -6
-                else:
-                    plr.vy = -3
-                
-                plr.vx *= plr.JumpBoost
-                plr.aVCX = math.clamp(abs(plr.vx), 1, plr.BaVCX * plr.JumpBoost)
+                plr.vy = plr.JumpsDone < 2 and -6 or -3
+
+                plr.aVCX = math.clamp(abs(plr.vx), 2, plr.BaVCX)
                 plr.grounded = False
-        elif pygameplus.WithinRange(plr.JumpHeldFrames, 5, 8, True, True) and plr.JumpsDone > 0:            
+        elif pygameplus.WithinRange(plr.JumpHeldFrames, 5, 8) and plr.JumpsDone > 0:            
             plr.vy -= 8/plr.JumpHeldFrames
         #end
 
         # Speed Cap
-        if plr.grounded:
-            plr.vx = math.clamp(plr.vx, -plr.gVCX, plr.gVCX)
-        else: plr.vx = math.clamp(plr.vx, -plr.aVCX, plr.aVCX)
+        plr.vx = plr.grounded and math.clamp(plr.vx, -plr.gVCX, plr.gVCX) or math.clamp(plr.vx, -plr.aVCX, plr.aVCX)
         plr.vy = math.clamp(plr.vy, -plr.VCY, plr.VCY)
 
         # X Collision
-        plr.rect.x += plr.vx * deltaTime
+        plr.rect.x += plr.vx * delta
         if pygame.sprite.spritecollideany(plr, geometry):
             if plr.vx != 0:
                 velDir = plr.vx > 0 and 1 or -1
+                plr.rect.x = round(plr.rect.x)
                 while pygame.sprite.spritecollideany(plr, geometry):
                     plr.rect.x -= velDir
                 plr.vx = 0
@@ -115,10 +122,11 @@ class player(pygame.sprite.Sprite):
         #end
         
         # Y Collision
-        plr.rect.y += plr.vy * deltaTime
+        plr.rect.y += plr.vy
         if pygame.sprite.spritecollideany(plr, geometry):
             if plr.vy != 0:
                 velDir = plr.vy > 0 and 1 or -1
+                plr.rect.y = round(plr.rect.y)
                 while pygame.sprite.spritecollideany(plr, geometry):
                     plr.rect.y -= velDir
                 #end
@@ -136,36 +144,35 @@ class player(pygame.sprite.Sprite):
             plr.vy += Gravity
         #end
         
+        cam.x += keys[K_RIGHT]-keys[K_LEFT]
+        cam.y += keys[K_DOWN]-keys[K_UP]
+        
         if DEBUG:
             print(plr.JumpsDone)
     #end
 #end
 
-def GetLevel(tileCache):
-    geometry = mpd.UpdateLevel(level, SCREEN_WIDTH, SCREEN_HEIGHT, tileCache=tileCache)
-    return geometry[0], geometry[1]
-
 # Main
 if __name__ == '__main__':
     plr = player()
+    cam = Camera()
     sprites = pygame.sprite.Group(plr)
     renderSprites = sprites.copy()
     Running = True
-    clock = pygame.time.Clock()
-    tileCache = []
-    deltaTime = 1
+    clock = pygameplus.clock
+    tileCache = mpd.CreateTileCache()
+    delta = 1
     while Running:
+        delta = pygameplus.GetDeltaTime()
         for event in pygame.event.get():
             Running = event.type != QUIT
-        geometry, tileCache = GetLevel(tileCache)
+        geometry, tileCache = mpd.UpdateLevel(level, SCREEN_WIDTH, SCREEN_HEIGHT, cam.x, cam.y, tileCache)
         plr.update(pygame.key.get_pressed())
         #Render
         screen.fill((0, 0, 0))
         geometry.draw(screen)
         renderSprites.draw(screen)
         pygame.display.update()
-        #Delta Time
-        deltaTime = clock.get_fps() / FPS
         clock.tick(FPS)
     pygame.quit()
 #end
