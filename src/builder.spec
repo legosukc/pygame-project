@@ -4,7 +4,7 @@ block_cipher = None
 
 main = Analysis(
     ['main.py'],
-    pathex=['Users/JaiEs/OneDrive/Documents/VS/Pygame/aguhghg/'],
+    pathex=['./'],
     binaries=[],
     datas=[
         ('res/', 'res/'),
@@ -25,7 +25,7 @@ main = Analysis(
 
 creator = Analysis(
     ['Level-Creator.py'],
-    pathex=['Users/JaiEs/OneDrive/Documents/VS/Pygame/aguhghg/'],
+    pathex=['./'],
     binaries=[],
     datas=[],
     hiddenimports=[],
