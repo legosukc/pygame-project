@@ -2,119 +2,138 @@ from pygame.locals import *
 from tkinter import filedialog
 import pygame
 import pygame.math as math
-import modules.mpd as mpd
+import mpd
 # Initialize Config
-SCREEN_WIDTH = 480
-SCREEN_HEIGHT = 360
+SCREEN_WIDTH = 480 * 2
+SCREEN_HEIGHT = 360 * 2
 FPS = 6
 
-level = mpd.ReadLevel(open('levels/level.mpd', 'rb'))
+level = mpd.ReadLevel(open('map/level.mpd', 'rb'))
 
 class SaveAs(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(ui):
         super().__init__()
-        self.image = pygame.image.load('graphics/SaveAs.png')
-        self.rect = self.image.get_rect()
-        self.rect.center = (self.image.get_width()*.5, SCREEN_HEIGHT+self.image.get_height()*.5)
-    def update(self):
-        mouse = pygame.mouse
-        if mouse.get_pressed()[0]:
-            self.image.set_alpha(200)
-            if self.rect.collidepoint(mouse.get_pos()[0], mouse.get_pos()[1]):
+        ui.image = pygame.image.load('gui/SaveAs.png')
+        ui.rect = ui.image.get_rect()
+        ui.rect.center = (ui.image.get_width()*.5, SCREEN_HEIGHT+ui.image.get_height()*.5)
+    def update(ui):
+        ms = pygame.mouse
+        if ms.get_pressed()[0]:
+            ui.image.set_alpha(200)
+            if ui.rect.collidepoint(ms.get_pos()[0], ms.get_pos()[1]):
                 file = filedialog.asksaveasfile('wb', confirmoverwrite=True, defaultextension='mpd', filetypes=[('Level', '.mpd')])
-                if file != None:
-                    mpd.WriteLevel(level, file)
-        else: self.image.set_alpha(255)
+                if file: mpd.WriteLevel(level, file)
+        else: ui.image.set_alpha(255)
 
 # Initialize Game
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT+SaveAs().image.get_height()))
 pygame.display.set_caption('The Prickly Penis') #Window Caption (top left thingy)
 
-class Cursor(pygame.sprite.WeakSprite):
-    def __init__(self):
+class Cursor(pygame.sprite.Sprite):
+    def __init__(cur):
         super().__init__()
-        self.selectedSpaceX = 0
-        self.selectedSpaceY = 0
-        self.selectedTileID = 1
-        self.selTool = 0 #0 = Build; 1 = Erase; 2 = Pick Tile
-    def update(self, keys):
-        def MoveTile():
-            self.selectedSpaceX = math.clamp(self.selectedSpaceX + keys[K_d]-keys[K_a], 0, 14)
-            self.selectedSpaceY = math.clamp(self.selectedSpaceY + keys[K_s]-keys[K_w], -1, 10)
-            self.rect.centerx = (self.selectedSpaceX * 32) + 16
-            self.rect.centery = (self.selectedSpaceY * 32) + 24
+        cur.selX = 0
+        cur.selY = 0
+        cur.TileID = 1
+        cur.selTool = 0 #0 = Build: 1 = Erase: 2 = Pick Tile
+        cur.image = pygame.image.load(f'res/{cur.TileID}.bmp')
+        cur.image.set_alpha(190)
+        cur.rect = cur.image.get_rect()
+
+    def update(cur, keys, lvl) -> list:
+        def swapTool(image, toolID=0):
+            cur.selTool = toolID
+            render.remove(outline)
+            cur.image = pygame.image.load(image)
+            cur.rect = cur.image.get_rect()
+        #end
+        
         if keys[K_1]:
-            self.selTool = 0
-            render.remove(outline)
+            swapTool(f'res/{cur.selTileID}.bmp')
             render.add(outline)
+            cur.image.set_alpha(190)
         elif keys[K_2]:
-            self.selTool = 1
-            render.remove(outline)
+            swapTool('gui/eraser.png', 1)
         elif keys[K_3]:
-            self.selTool = 2
-            render.remove(outline)
-        # Build
-        if self.selTool == 0:
-            #Cycle Tile
-            self.selectedTileID = math.clamp(self.selectedTileID + keys[K_e]-keys[K_q], 1, 7)
-            self.image = pygame.image.load(f'tiles/{self.selectedTileID}.bmp')
-            self.image.set_alpha(190)
-            self.rect = self.image.get_rect()
-            MoveTile()
-            #Outline
-            outline.rect.center = self.rect.center
-            #Write Tile To Level
-            if keys[K_SPACE]:
-                level[self.selectedSpaceY+1][self.selectedSpaceX] = self.selectedTileID
-        #Eraser
-        elif self.selTool == 1:
-            self.image = pygame.image.load('graphics/eraser.png')
-            self.rect = self.image.get_rect()
-            MoveTile()
-            if keys[K_SPACE]:
-                level[self.selectedSpaceY+1][self.selectedSpaceX] = 0
-        elif self.selTool == 2:
-            self.image = pygame.image.load('graphics/picker.png')
-            self.rect = self.image.get_rect()
-            MoveTile()
-            if keys[K_SPACE]:
-                if level[self.selectedSpaceY+1][self.selectedSpaceX] != None:
-                    self.selectedTileID = level[self.selectedSpaceY+1][self.selectedSpaceX]
-                    self.selTool = 0
+            swapTool('gui/picker.png', 2)
+        #end
+        cur.selX = math.clamp(cur.selX + keys[K_d]-keys[K_a], 0, (SCREEN_WIDTH//32)-1)
+        cur.selY = math.clamp(cur.selY + keys[K_s]-keys[K_w], -1, (SCREEN_HEIGHT//32)-1)
+        cur.rect.centerx = (cur.selX * 32) + 16
+        cur.rect.centery = (cur.selY * 32) - 8
+        
+        if keys[K_SPACE]:
+            if cur.selTool == 2:
+                if lvl[cur.selY][cur.selX]:
+                    cur.selTileID = lvl[cur.selY][cur.selX]
+                    swapTool(f'res/{cur.TileID}.bmp')
                     render.add(outline)
+                #end
+            else: #Rubber And Build Tool
+                #Write to level
+                while True:
+                    try:
+                        lvl[cur.selY][cur.selX] = cur.selTool == 0 and cur.TileID or 0
+                    except IndexError:
+                        lvl = mpd.ExtendLevelLength(lvl)
+                        continue
+                    else: break
+                #end
             #end
         #end
+        
+        #Build Tool Extras
+        if cur.selTool == 0:
+            #Cycle Tile
+            cur.TileID = math.clamp(cur.TileID + keys[K_e]-keys[K_q], 1, 7)
+            #Outline
+            outline.rect.center = cur.rect.center
+        #end
+        return lvl
     #end
 #end
 
-class CursorOutline(pygame.sprite.WeakSprite):
-    def __init__(self):
+class CursorOutline(pygame.sprite.Sprite):
+    def __init__(out):
         super().__init__()
-        self.image = pygame.image.load('graphics/Select.png')
-        self.rect = self.image.get_rect()
-        self.image.set_alpha(170)
-
+        out.image = pygame.image.load('gui/Select.png')
+        out.rect = out.image.get_rect()
+        out.image.set_alpha(170)
+        
+class Camera():
+    def __init__(cam):
+        cam.x = 0
+        cam.y = 0
+        cam.center = (cam.x, cam.y)
+    def update(cam, keys):
+        cam.x += keys[K_RIGHT]-keys[K_LEFT]
+        cam.y += keys[K_UP]-keys[K_DOWN]
+        cam.center += (keys[K_RIGHT]-keys[K_LEFT], keys[K_UP]-keys[K_DOWN])
+        print(cam.center)
+        
 # Main
 if __name__ == '__main__':
     Running = True
     cursor = Cursor()
     outline = CursorOutline()
+    cam = Camera()
     clock = pygame.time.Clock()
     render = pygame.sprite.Group(outline, cursor)
     ui = pygame.sprite.Group(SaveAs())
-    tileCache = []
+    tileCache = mpd.CreateTileCache()
     while Running:
         for event in pygame.event.get():
             Running = event.type != QUIT
-        cursor.update(pygame.key.get_pressed())
+        geometry, tileCache = mpd.UpdateLevel(level, SCREEN_WIDTH, SCREEN_HEIGHT, tileCache=tileCache)
+        keys = pygame.key.get_pressed()
+        level = cursor.update(keys, level)
+        cam.update(keys)
+        ui.update()
         #Render
         screen.fill((0, 0, 0))
-        geometry = mpd.UpdateLevel(level, SCREEN_WIDTH, SCREEN_HEIGHT, tileCache=tileCache)
-        tileCache = geometry[1]
-        geometry[0].draw(screen)
+        geometry.draw(screen)
         render.draw(screen)
-        ui.update()
         ui.draw(screen)
         pygame.display.update()
         clock.tick(FPS)

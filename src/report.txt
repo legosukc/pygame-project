@@ -1,0 +1,3 @@
+best avg fps is 1811 (outdated)
+current is about 272 (outdated)
+3.8 cpu usage (really good)
