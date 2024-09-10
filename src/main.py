@@ -14,7 +14,7 @@ screen.blit(progress, (SCREEN_WIDTH-progress.get_width(), SCREEN_HEIGHT-progress
 pygame.display.update()
 # Window Config
 pygame.display.set_caption('platformer') #Window Caption (top left thingy)
-#pygame.display.set_icon(pygame.image.load('graphics/icon.ico'))
+pygame.display.set_icon(pygame.image.load('res/icon.png'))
 
 # Import Modules
 from pygame.locals import *

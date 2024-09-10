@@ -2,8 +2,6 @@
 
 block_cipher = None
 
-Splash.__init__('res/icon.png', binaries, datas, **kwargs)
-
 main = Analysis(
     ['main.py'],
     pathex=['Users/JaiEs/OneDrive/Documents/VS/Pygame/aguhghg/'],
@@ -26,12 +24,10 @@ main = Analysis(
 )
 
 creator = Analysis(
-    ['Level-Creator copy.py'],
+    ['Level-Creator.py'],
     pathex=['Users/JaiEs/OneDrive/Documents/VS/Pygame/aguhghg/'],
-    binaries=['tkinter'],
-    datas=[
-
-    ],
+    binaries=[],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
